@@ -22,7 +22,7 @@
         };
         "aarch64-linux" = {
           platform = "linux-aarch64";
-          hash = "sha256-0dzrAA/gXF4sC1555PRKAHBQdI03aQnf/utUSp8dZQ=";
+          hash = "sha256-MhHEYHBctaDH9JVkN/guDCG1if9Bip1aP3n+JkvHCvA=";
         };
         "x86_64-darwin" = {
           platform = "mac-x64";
