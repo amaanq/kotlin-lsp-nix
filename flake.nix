@@ -6,7 +6,7 @@
   outputs =
     { self, nixpkgs }:
     let
-      version = "261.13587.0";
+      version = "262.1817.0";
 
       systems = [
         "x86_64-linux"
@@ -18,19 +18,19 @@
       platformInfo = {
         "x86_64-linux" = {
           platform = "linux-x64";
-          hash = "sha256-EweSqy30NJuxvlJup78O+e+JOkzvUdb6DshqAy1j9jE=";
+          hash = "sha256-BsjmllnZsB5i9NJBf8mb47aw6PoeZZbtp0OX8VV0VOA=";
         };
         "aarch64-linux" = {
           platform = "linux-aarch64";
-          hash = "sha256-MhHEYHBctaDH9JVkN/guDCG1if9Bip1aP3n+JkvHCvA=";
+          hash = "sha256-4JxkCX2GHz8Ld6ilVuNlPMl/YvwCBH0JivR/lukcb88=";
         };
         "x86_64-darwin" = {
           platform = "mac-x64";
-          hash = "sha256-zMuUcahT1IiCT1NTrMCIzUNM0U6U3zaBkJtbGrzF7I8=";
+          hash = "sha256-M/bNUdL9Ctq1ZC1bczKQPD3Pyv6Tpiy1QBsjuX1rSXA=";
         };
         "aarch64-darwin" = {
           platform = "mac-aarch64";
-          hash = "sha256-zwlzVt3KYN0OXKr6sI9XSijXSbTImomSTGRGa+3zCK8=";
+          hash = "sha256-OFPQ7MfGjq6rB1y13aIF09Ij296AMg1PCCZn1pwjoQA=";
         };
       };
 
