@@ -6,7 +6,7 @@
   outputs =
     inputs:
     let
-      version = "262.4739.0";
+      version = "263.7084.0";
 
       systems = [
         "x86_64-linux"
@@ -20,20 +20,20 @@
       platformInfo = {
         "x86_64-linux" = {
           file = "kotlin-server-${version}.tar.gz";
-          hash = "sha256-I1K/ypOnAtzHJ1btYur/SYAm7FLU2QzKcMjmeFXC+2c=";
+          hash = "sha256-Ld04XYQh62ahCzpAzZzwhFtI0apmhZIhQMVRm6ak+eQ=";
         };
         "aarch64-linux" = {
           file = "kotlin-server-${version}-aarch64.tar.gz";
-          hash = "sha256-/h51KBr1ob5RHyVlcdx0YBYYblPGlc+KxVG6y9HdqGs=";
+          hash = "sha256-gxv8v1/zSQO9EPD7S1YA/2igI809uq/tah8AVdCKNds=";
         };
         "x86_64-darwin" = {
           file = "kotlin-server-${version}.sit";
-          hash = "sha256-glBgiXGfiKHH9rb65eFWgmFsEycei6ZAVa0s/ButYaw=";
+          hash = "sha256-JQrQ8ApnI8lsy8oHjeO3IPpw1PlOMVfJ096SdZHw+DA=";
           extension = "zip";
         };
         "aarch64-darwin" = {
           file = "kotlin-server-${version}-aarch64.sit";
-          hash = "sha256-/Wzvp0vbw8UQfCsHcT5SPLFYxo5clMy86Iy3uGDPOYQ=";
+          hash = "sha256-wD4BU8Be6pLOmrnaojm7EHr+lfYAp5NjCoPC+M3deHM=";
           extension = "zip";
         };
       };
@@ -54,7 +54,7 @@
 
           src = pkgs.fetchzip (
             {
-              url = "https://download-cdn.jetbrains.com/kotlin-lsp/${version}/${info.file}";
+              url = "https://download.jetbrains.com/language-server/kotlin-server/${version}/${info.file}";
               inherit (info) hash;
             }
             // lib.optionalAttrs (info ? extension) { inherit (info) extension; }
