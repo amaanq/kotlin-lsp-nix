@@ -4,9 +4,9 @@
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
 
   outputs =
-    { self, nixpkgs }:
+    inputs:
     let
-      version = "262.1817.0";
+      version = "262.4739.0";
 
       systems = [
         "x86_64-linux"
@@ -15,123 +15,102 @@
         "aarch64-darwin"
       ];
 
+      # Standalone Kotlin LSP archives. Linux ships .tar.gz while macOS ships
+      # .sit files that are actually plain zip containers.
       platformInfo = {
         "x86_64-linux" = {
-          platform = "linux-x64";
-          hash = "sha256-BsjmllnZsB5i9NJBf8mb47aw6PoeZZbtp0OX8VV0VOA=";
+          file = "kotlin-server-${version}.tar.gz";
+          hash = "sha256-I1K/ypOnAtzHJ1btYur/SYAm7FLU2QzKcMjmeFXC+2c=";
         };
         "aarch64-linux" = {
-          platform = "linux-aarch64";
-          hash = "sha256-4JxkCX2GHz8Ld6ilVuNlPMl/YvwCBH0JivR/lukcb88=";
+          file = "kotlin-server-${version}-aarch64.tar.gz";
+          hash = "sha256-/h51KBr1ob5RHyVlcdx0YBYYblPGlc+KxVG6y9HdqGs=";
         };
         "x86_64-darwin" = {
-          platform = "mac-x64";
-          hash = "sha256-M/bNUdL9Ctq1ZC1bczKQPD3Pyv6Tpiy1QBsjuX1rSXA=";
+          file = "kotlin-server-${version}.sit";
+          hash = "sha256-glBgiXGfiKHH9rb65eFWgmFsEycei6ZAVa0s/ButYaw=";
+          extension = "zip";
         };
         "aarch64-darwin" = {
-          platform = "mac-aarch64";
-          hash = "sha256-OFPQ7MfGjq6rB1y13aIF09Ij296AMg1PCCZn1pwjoQA=";
+          file = "kotlin-server-${version}-aarch64.sit";
+          hash = "sha256-/Wzvp0vbw8UQfCsHcT5SPLFYxo5clMy86Iy3uGDPOYQ=";
+          extension = "zip";
         };
       };
 
-      forAllSystems = nixpkgs.lib.genAttrs systems;
+      forAllSystems = inputs.nixpkgs.lib.genAttrs systems;
 
       mkPackage =
         system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
+          pkgs = inputs.nixpkgs.legacyPackages.${system};
+          inherit (pkgs) lib;
           info = platformInfo.${system};
+          isLinux = pkgs.stdenv.hostPlatform.isLinux;
         in
         pkgs.stdenv.mkDerivation {
           pname = "kotlin-lsp";
           inherit version;
 
-          src = pkgs.fetchzip {
-            url = "https://download-cdn.jetbrains.com/kotlin-lsp/${version}/kotlin-lsp-${version}-${info.platform}.zip";
-            inherit (info) hash;
-            stripRoot = false;
-          };
+          src = pkgs.fetchzip (
+            {
+              url = "https://download-cdn.jetbrains.com/kotlin-lsp/${version}/${info.file}";
+              inherit (info) hash;
+            }
+            // lib.optionalAttrs (info ? extension) { inherit (info) extension; }
+          );
 
-          nativeBuildInputs = [ pkgs.makeWrapper ];
-          buildInputs = [ pkgs.jdk21 ];
+          nativeBuildInputs = lib.optionals isLinux [
+            pkgs.autoPatchelfHook
+          ];
+
+          # JBR bundles a full AWT/Swing-capable JDK, but the LSP runs with
+          # -Djava.awt.headless=true so we don't pull in the X11/GTK stack
+          # just to satisfy libraries that never get dlopen'd. Anything the
+          # JVM and the LSP's actual native libs (rocksdbjni, filewatcher,
+          # jna, pty4j, sqliteij) need at runtime is here.
+          buildInputs = lib.optionals isLinux (
+            with pkgs;
+            [
+              glibc
+              stdenv.cc.cc.lib
+              zlib
+            ]
+          );
+
+          dontStrip = true;
+
+          # JBR ships AWT/Swing/audio libs that link against the X11, Wayland,
+          # font, and ALSA stacks, however, `-Djava.awt.headless=true` means nothing
+          # dlopens them at runtime, so we let patchelf leave them with
+          # unresolved deps rather than pulling in the whole GUI stack.
+          autoPatchelfIgnoreMissingDeps = lib.optionals isLinux [
+            "libc.musl-x86_64.so.1"
+            "libc.musl-aarch64.so.1"
+            "libX11.so.6"
+            "libXext.so.6"
+            "libXi.so.6"
+            "libXrender.so.1"
+            "libXtst.so.6"
+            "libwayland-client.so.0"
+            "libwayland-cursor.so.0"
+            "libxkbcommon.so.0"
+            "libfreetype.so.6"
+            "libasound.so.2"
+          ];
 
           installPhase = ''
             runHook preInstall
 
-            mkdir -p $out/lib $out/bin $out/native
-            cp -r lib/* $out/lib/
-            cp -r native/* $out/native/
+            mkdir -p $out/share/kotlin-lsp $out/bin
+            cp -r . $out/share/kotlin-lsp/
 
-            cat > $out/bin/kotlin-lsp << 'SCRIPT'
-            #!/usr/bin/env bash
-            SCRIPT
-
-            cat >> $out/bin/kotlin-lsp << SCRIPT
-            exec ${pkgs.jdk21}/bin/java \\
-              --add-opens java.base/java.io=ALL-UNNAMED \\
-              --add-opens java.base/java.lang=ALL-UNNAMED \\
-              --add-opens java.base/java.lang.ref=ALL-UNNAMED \\
-              --add-opens java.base/java.lang.reflect=ALL-UNNAMED \\
-              --add-opens java.base/java.net=ALL-UNNAMED \\
-              --add-opens java.base/java.nio=ALL-UNNAMED \\
-              --add-opens java.base/java.nio.charset=ALL-UNNAMED \\
-              --add-opens java.base/java.text=ALL-UNNAMED \\
-              --add-opens java.base/java.time=ALL-UNNAMED \\
-              --add-opens java.base/java.util=ALL-UNNAMED \\
-              --add-opens java.base/java.util.concurrent=ALL-UNNAMED \\
-              --add-opens java.base/java.util.concurrent.atomic=ALL-UNNAMED \\
-              --add-opens java.base/java.util.concurrent.locks=ALL-UNNAMED \\
-              --add-opens java.base/jdk.internal.vm=ALL-UNNAMED \\
-              --add-opens java.base/sun.net.dns=ALL-UNNAMED \\
-              --add-opens java.base/sun.nio.ch=ALL-UNNAMED \\
-              --add-opens java.base/sun.nio.fs=ALL-UNNAMED \\
-              --add-opens java.base/sun.security.ssl=ALL-UNNAMED \\
-              --add-opens java.base/sun.security.util=ALL-UNNAMED \\
-              --add-opens java.desktop/java.awt=ALL-UNNAMED \\
-              --add-opens java.desktop/java.awt.dnd.peer=ALL-UNNAMED \\
-              --add-opens java.desktop/java.awt.event=ALL-UNNAMED \\
-              --add-opens java.desktop/java.awt.font=ALL-UNNAMED \\
-              --add-opens java.desktop/java.awt.image=ALL-UNNAMED \\
-              --add-opens java.desktop/java.awt.peer=ALL-UNNAMED \\
-              --add-opens java.desktop/javax.swing=ALL-UNNAMED \\
-              --add-opens java.desktop/javax.swing.plaf.basic=ALL-UNNAMED \\
-              --add-opens java.desktop/javax.swing.text=ALL-UNNAMED \\
-              --add-opens java.desktop/javax.swing.text.html=ALL-UNNAMED \\
-              --add-opens java.desktop/com.apple.eawt=ALL-UNNAMED \\
-              --add-opens java.desktop/com.apple.eawt.event=ALL-UNNAMED \\
-              --add-opens java.desktop/com.apple.laf=ALL-UNNAMED \\
-              --add-opens java.desktop/com.sun.java.swing=ALL-UNNAMED \\
-              --add-opens java.desktop/com.sun.java.swing.plaf.gtk=ALL-UNNAMED \\
-              --add-opens java.desktop/sun.awt=ALL-UNNAMED \\
-              --add-opens java.desktop/sun.awt.X11=ALL-UNNAMED \\
-              --add-opens java.desktop/sun.awt.datatransfer=ALL-UNNAMED \\
-              --add-opens java.desktop/sun.awt.image=ALL-UNNAMED \\
-              --add-opens java.desktop/sun.awt.windows=ALL-UNNAMED \\
-              --add-opens java.desktop/sun.font=ALL-UNNAMED \\
-              --add-opens java.desktop/sun.java2d=ALL-UNNAMED \\
-              --add-opens java.desktop/sun.lwawt=ALL-UNNAMED \\
-              --add-opens java.desktop/sun.lwawt.macosx=ALL-UNNAMED \\
-              --add-opens java.desktop/sun.swing=ALL-UNNAMED \\
-              --add-opens java.management/sun.management=ALL-UNNAMED \\
-              --add-opens jdk.attach/sun.tools.attach=ALL-UNNAMED \\
-              --add-opens jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED \\
-              --add-opens jdk.internal.jvmstat/sun.jvmstat.monitor=ALL-UNNAMED \\
-              --add-opens jdk.jdi/com.sun.tools.jdi=ALL-UNNAMED \\
-              --enable-native-access=ALL-UNNAMED \\
-              -Djdk.lang.Process.launchMechanism=FORK \\
-              -Djava.awt.headless=true \\
-              -Xmx4g \\
-              -XX:+UseG1GC \\
-              -XX:+UseStringDeduplication \\
-              -cp "$out/lib/*" \\
-              com.jetbrains.ls.kotlinLsp.KotlinLspServerKt "\$@"
-            SCRIPT
-            chmod +x $out/bin/kotlin-lsp
+            ln -s $out/share/kotlin-lsp/bin/intellij-server $out/bin/kotlin-lsp
 
             runHook postInstall
           '';
 
-          meta = with pkgs.lib; {
+          meta = with lib; {
             description = "JetBrains Kotlin Language Server";
             homepage = "https://github.com/Kotlin/kotlin-lsp";
             license = licenses.asl20;
